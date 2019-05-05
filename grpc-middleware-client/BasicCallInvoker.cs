@@ -1,19 +1,23 @@
 ﻿using Grpc.Core;
 using Grpc.Core.Utils;
+using Polly;
 
 namespace grpc_middleware_client
 {
     public class BasicCallInvoker : CallInvoker
     {
-        readonly Channel channel;
+        private readonly Channel _Channel;
+
+        private readonly Policy _UnaryCallPolicy;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Grpc.Core.DefaultCallInvoker"/> class.
         /// </summary>
         /// <param name="channel">Channel to use.</param>
-        public BasicCallInvoker(Channel channel)
+        public BasicCallInvoker(Channel channel, Policy unaryCallPolicy)
         {
-            this.channel = GrpcPreconditions.CheckNotNull(channel);
+            _Channel = GrpcPreconditions.CheckNotNull(channel);
+            _UnaryCallPolicy = unaryCallPolicy;
         }
 
         /// <summary>
@@ -22,7 +26,13 @@ namespace grpc_middleware_client
         public override TResponse BlockingUnaryCall<TRequest, TResponse>(Method<TRequest, TResponse> method, string host, CallOptions options, TRequest request)
         {
             var call = CreateCall(method, host, options);
-            return Calls.BlockingUnaryCall(call, request);
+
+            TResponse response = null;
+            _UnaryCallPolicy.Execute(() => {
+                response = Calls.BlockingUnaryCall(call, request);
+                
+            });
+            return response;
         }
 
         /// <summary>
@@ -31,7 +41,9 @@ namespace grpc_middleware_client
         public override AsyncUnaryCall<TResponse> AsyncUnaryCall<TRequest, TResponse>(Method<TRequest, TResponse> method, string host, CallOptions options, TRequest request)
         {
             var call = CreateCall(method, host, options);
-            return Calls.AsyncUnaryCall(call, request);
+            var response = Calls.AsyncUnaryCall(call, request);
+
+            return response;
         }
 
         /// <summary>
@@ -41,7 +53,9 @@ namespace grpc_middleware_client
         public override AsyncServerStreamingCall<TResponse> AsyncServerStreamingCall<TRequest, TResponse>(Method<TRequest, TResponse> method, string host, CallOptions options, TRequest request)
         {
             var call = CreateCall(method, host, options);
-            return Calls.AsyncServerStreamingCall(call, request);
+            var response = Calls.AsyncServerStreamingCall(call, request);
+
+            return response;
         }
 
         /// <summary>
@@ -51,7 +65,9 @@ namespace grpc_middleware_client
         public override AsyncClientStreamingCall<TRequest, TResponse> AsyncClientStreamingCall<TRequest, TResponse>(Method<TRequest, TResponse> method, string host, CallOptions options)
         {
             var call = CreateCall(method, host, options);
-            return Calls.AsyncClientStreamingCall(call);
+            var response = Calls.AsyncClientStreamingCall(call);
+
+            return response;
         }
 
         /// <summary>
@@ -62,7 +78,9 @@ namespace grpc_middleware_client
         public override AsyncDuplexStreamingCall<TRequest, TResponse> AsyncDuplexStreamingCall<TRequest, TResponse>(Method<TRequest, TResponse> method, string host, CallOptions options)
         {
             var call = CreateCall(method, host, options);
-            return Calls.AsyncDuplexStreamingCall(call);
+            var response = Calls.AsyncDuplexStreamingCall(call);
+
+            return response;
         }
 
         /// <summary>Creates call invocation details for given method.</summary>
@@ -70,7 +88,7 @@ namespace grpc_middleware_client
                 where TRequest : class
                 where TResponse : class
         {
-            return new CallInvocationDetails<TRequest, TResponse>(channel, method, host, options);
+            return new CallInvocationDetails<TRequest, TResponse>(_Channel, method, host, options);
         }
     }
 }
