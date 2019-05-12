@@ -18,6 +18,11 @@ namespace grpc_middleware_discovery_consul
             };
         }
 
+        /// <summary>
+        /// Finds a service by its id. Uses the catalog
+        /// </summary>
+        /// <param name="serviceId"></param>
+        /// <returns></returns>
         public async Task<ServiceDescription> FindService(string serviceId)
         {
             var result = await _HttpClient.GetAsync($"v1/catalog/service/{serviceId}");
@@ -29,9 +34,30 @@ namespace grpc_middleware_discovery_consul
             return new ServiceDescription();
         }
 
-        public async Task<bool> RegisterService(ServiceDescription serviceDescription)
+        /// <summary>
+        /// Registers the service on a remote machine using the catalog api
+        /// </summary>
+        /// <param name="serviceDescription"></param>
+        /// <returns></returns>
+        public async Task<bool> RegisterServiceRemote(ServiceDescription serviceDescription)
         {
             var result = await _HttpClient.PutAsync("v1/catalog/register", new StringContent(JsonConvert.SerializeObject(serviceDescription)));
+
+            if (result.IsSuccessStatusCode)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Registers the service on the local consul node using the agent api
+        /// </summary>
+        /// <param name="serviceDescription"></param>
+        /// <returns></returns>
+        public async Task<bool> RegisterService(ServiceDescription serviceDescription)
+        {
+            var result = await _HttpClient.PutAsync("agent/service/register", new StringContent(JsonConvert.SerializeObject(serviceDescription)));
 
             if (result.IsSuccessStatusCode)
             {

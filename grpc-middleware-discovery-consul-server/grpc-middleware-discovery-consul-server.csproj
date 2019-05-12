@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <RootNamespace>grpc_middleware_discovery_consul</RootNamespace>
+    <RootNamespace>grpc-middleware-discovery-consul-server</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,10 +11,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\grpc-middleware-discovery\grpc-middleware-discovery.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Catalog\" />
   </ItemGroup>
 
 </Project>

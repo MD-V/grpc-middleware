@@ -16,18 +16,14 @@ namespace grpc_middleware_server
 
     class Program
     {
-        const int Port = 50051;
-
         public static void Main(string[] args)
         {
-            Server server = new Server
+            var server = new GrpcMiddlewareServer(null, "localhost")
             {
-                Services = { Greeter.BindService(new GreeterImpl()) },
-                Ports = { new ServerPort("localhost", Port, ServerCredentials.Insecure) }
+                Services = { Greeter.BindService(new GreeterImpl()) }
             };
-            server.Start();
 
-            Console.WriteLine("Greeter server listening on port " + Port);
+            server.Start();
             Console.WriteLine("Press any key to stop the server...");
             Console.ReadKey();
 
