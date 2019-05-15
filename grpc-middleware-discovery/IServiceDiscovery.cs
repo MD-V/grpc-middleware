@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace grpc_middleware_discovery
 {
@@ -6,6 +7,10 @@ namespace grpc_middleware_discovery
     {
         Task<bool> RegisterService(ServiceDescription serviceDescription);
 
-        Task<ServiceDescription> FindService(string serviceId);
+        Task<ServiceDescription> FindServiceLocal(string serviceId);
+
+        Task<IEnumerable<ServiceDescription>> FindService(string serviceName);
+
+        Task<bool> DeregisterService(string id);
     }
 }

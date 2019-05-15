@@ -1,6 +1,8 @@
 ﻿using Grpc.Core;
+using Grpc.Health.V1;
 using grpc_middleware_discovery;
 using Polly;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -18,10 +20,13 @@ namespace grpc_middleware_server
         private readonly string _Host;
         private readonly ServerCredentials _ServerCredentials;
         private Server _ServerInstance;
+        private IList<string> _ServerIds = new List<string>();
 
         public ICollection<ServerServiceDefinition> Services { get; }
 
         public ICollection<ServerPort> Ports { get; }
+
+        public bool ServerRunning { get; private set; }
 
         public GrpcMiddlewareServer(IServiceDiscovery serviceDiscovery, string host, ServerCredentials serverCredentials = null, IEnumerable<ChannelOption> options = null, Policy portRetryPolicy = null)
         {
@@ -48,7 +53,7 @@ namespace grpc_middleware_server
             }
         }
 
-        public void Start()
+        public async Task Start()
         {
             _PortRetryPolicy.Execute(() =>
             {
@@ -56,10 +61,8 @@ namespace grpc_middleware_server
                 if (!Ports.Any())
                 {
                     var port = FreeTcpPort();
-
                     Ports.Add(new ServerPort(_Host, port, _ServerCredentials));
                 }
-                // TODO Start register Task
 
                 if (_Options != null)
                 {
@@ -75,27 +78,61 @@ namespace grpc_middleware_server
                     _ServerInstance.Ports.Add(port);
                 }
 
+               
                 foreach (var srv in Services)
                 {
                     _ServerInstance.Services.Add(srv);
                 }
+
+                // Add health check service
+                _ServerInstance.Services.Add(Health.BindService(new HealthCheckImpl(this)));
 
                 _ServerInstance.Start();
 
 #if DEBUG
                 Debug.WriteLine("Server running");
                 Debug.WriteLine("Endpoints:");
-                Debug.WriteLine($"   {string.Join(",", _ServerInstance.Ports.Select(a=> $"{a.Host}:{a.Port}"))}");
+                Debug.WriteLine($"   {string.Join(",", _ServerInstance.Ports.Select(a => $"{a.Host}:{a.Port}"))}");
 #endif
             });
 
+            ServerRunning = true;
+
+            foreach (var adress in _ServerInstance.Ports)
+            {
+                var uriBuilder = new UriBuilder();
+                uriBuilder.Host = adress.Host;
+                uriBuilder.Port = adress.Port;
+                uriBuilder.Scheme = string.Empty;
+
+                var adressString = uriBuilder.Uri.ToString();
+
+                var id = $"{nameof(GrpcMiddlewareServer)}_{Guid.NewGuid().ToString()}";
+
+                _ServerIds.Add(id);
+
+                await _ServiceDiscovery.RegisterService(new ServiceDescription()
+                {
+                    Adress = adressString,
+                    Id = id,
+                    Port = adress.Port,
+                    Name = nameof(GrpcMiddlewareServer),
+                });
+            }
+
+            
         }
 
         public async Task ShutdownAsync()
         {
+            foreach (var serverId in _ServerIds)
+            {
+                await _ServiceDiscovery.DeregisterService(serverId);
+            }
             await _ServerInstance.ShutdownAsync();
-        }
 
+            ServerRunning = false;
+        }
 
         static int FreeTcpPort()
         {

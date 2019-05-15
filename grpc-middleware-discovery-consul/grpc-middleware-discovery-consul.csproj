@@ -13,8 +13,4 @@
     <ProjectReference Include="..\grpc-middleware-discovery\grpc-middleware-discovery.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Catalog\" />
-  </ItemGroup>
-
 </Project>

@@ -4,6 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.1</TargetFramework>
     <RootNamespace>grpc_middleware_server</RootNamespace>
+    <LangVersion>7.3</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,7 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\grpc-middleware-discovery-consul\grpc-middleware-discovery-consul.csproj" />
     <ProjectReference Include="..\grpc-middleware-discovery\grpc-middleware-discovery.csproj" />
+    <ProjectReference Include="..\grpc-middleware-server-protos\grpc-middleware-server-protos.csproj" />
     <ProjectReference Include="..\Protos\Protos.csproj" />
   </ItemGroup>
 

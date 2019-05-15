@@ -1,4 +1,5 @@
 ﻿using Grpc.Core;
+using grpc_middleware_discovery_consul;
 using Helloworld;
 using System;
 using System.Threading.Tasks;
@@ -16,14 +17,14 @@ namespace grpc_middleware_server
 
     class Program
     {
-        public static void Main(string[] args)
+        public async static Task Main(string[] args)
         {
-            var server = new GrpcMiddlewareServer(null, "localhost")
+            var server = new GrpcMiddlewareServer(new ConsulClient(new Uri("http://127.0.0.1:8500")), "localhost")
             {
                 Services = { Greeter.BindService(new GreeterImpl()) }
             };
 
-            server.Start();
+            await server.Start();
             Console.WriteLine("Press any key to stop the server...");
             Console.ReadKey();
 
