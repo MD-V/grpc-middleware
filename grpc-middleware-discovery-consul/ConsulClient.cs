@@ -1,7 +1,6 @@
 ﻿using grpc_middleware_discovery;
 using grpc_middleware_discovery_consul.Agent;
 using Newtonsoft.Json;
-using Polly;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -12,9 +11,14 @@ using System.Threading.Tasks;
 
 namespace grpc_middleware_discovery_consul
 {
-    public class ConsulClient : IServiceDiscovery
+    public class ConsulClient : IServiceDiscovery, IDisposable
     {
         private readonly HttpClient _HttpClient;
+
+        private readonly ManualResetEventSlim _ObserverCancelationEvent = new ManualResetEventSlim();
+        private readonly ConcurrentDictionary<string, ConcurrentBag<IServiceObserver>> _ServiceObservers = new ConcurrentDictionary<string, ConcurrentBag<IServiceObserver>>();
+        private readonly ConcurrentDictionary<string, ConcurrentBag<ServiceDescription>> _Services = new ConcurrentDictionary<string, ConcurrentBag<ServiceDescription>>();
+        private readonly ConcurrentBag<Task> _ServiceObserverTasks = new ConcurrentBag<Task>();
 
         public ConsulClient(Uri consulUri)
         {
@@ -47,6 +51,7 @@ namespace grpc_middleware_discovery_consul
                     Name = serviceRegistration.Name,
                 };
             }
+
             return null;
         }
 
@@ -68,7 +73,8 @@ namespace grpc_middleware_discovery_consul
                     Name = a.ServiceName,
                 });
             }
-            return null;
+
+            return Enumerable.Empty<ServiceDescription>();
         }
 
         /// <summary>
@@ -117,6 +123,7 @@ namespace grpc_middleware_discovery_consul
             {
                 return true;
             }
+
             return false;
         }
 
@@ -133,14 +140,11 @@ namespace grpc_middleware_discovery_consul
             {
                 return true;
             }
+
             return false;
         }
 
-        private ConcurrentDictionary<string, ConcurrentBag<IServiceObserver>> _ServiceObservers = new ConcurrentDictionary<string, ConcurrentBag<IServiceObserver>>();
-        private ConcurrentDictionary<string, ConcurrentBag<ServiceDescription>> _Services = new ConcurrentDictionary<string, ConcurrentBag<ServiceDescription>>();
-        private ConcurrentBag<Task> _ServiceObserverTasks = new ConcurrentBag<Task>();
-        private Policy _ServiceObserverPolicy = Policy.Bulkhead(8);
-
+      
         public void SubscribeService(IServiceObserver serviceObserver)
         {
             Console.WriteLine("SubscribeService");
@@ -158,16 +162,19 @@ namespace grpc_middleware_discovery_consul
                 Console.WriteLine("SubscribeService servicesBag is empty");
                 _ServiceObserverTasks.Add(Task.Run(async () =>
                 {
-                    while (true)
-                    { Console.WriteLine("SubscribeService Find Services " + serviceObserver.ServiceName);
+                    while (!_ObserverCancelationEvent.IsSet)
+                    {
+                        Console.WriteLine("SubscribeService Find Services " + serviceObserver.ServiceName);
                        
                         var services = await FindService(serviceObserver.ServiceName);
                         var newServices = services.Where(s => !servicesBag.Select(x => x.Id).Contains(s.Id)).ToArray();
                         var oldServices = servicesBag.Where(s => !services.Select(x => x.Id).Contains(s.Id)).ToArray();
+
                         while (!servicesBag.IsEmpty)
                         {
                             servicesBag.TryTake(out ServiceDescription s);
                         }
+
                         foreach (var currentService in services)
                         {
                             servicesBag.Add(currentService);
@@ -185,11 +192,44 @@ namespace grpc_middleware_discovery_consul
                             }
                         }
 
-                        Thread.Sleep(10 * 1000);
+                        _ObserverCancelationEvent.Wait(10 * 1000);
                     }
                 }));
             }
         }
+
+        #region IDisposable Support
+        private bool disposedValue = false; // Dient zur Erkennung redundanter Aufrufe.
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    // TODO: verwalteten Zustand (verwaltete Objekte) entsorgen.
+                    _ObserverCancelationEvent.Set();
+                    Task.WaitAll(_ServiceObserverTasks.ToArray());
+                    foreach(var task in _ServiceObserverTasks)
+                    {
+                        task.Dispose();
+                    }
+
+                    _HttpClient.Dispose();
+                }
+
+                disposedValue = true;
+            }
+        }
+
+
+        // Dieser Code wird hinzugefügt, um das Dispose-Muster richtig zu implementieren.
+        public void Dispose()
+        {
+            // Ändern Sie diesen Code nicht. Fügen Sie Bereinigungscode in Dispose(bool disposing) weiter oben ein.
+            Dispose(true);
+        }
+        #endregion
     }
 
 }
