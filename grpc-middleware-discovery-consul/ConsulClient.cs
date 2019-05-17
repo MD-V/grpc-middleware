@@ -163,7 +163,7 @@ namespace grpc_middleware_discovery_consul
                        
                         var services = await FindService(serviceObserver.ServiceName);
                         var newServices = services.Where(s => !servicesBag.Select(x => x.Id).Contains(s.Id)).ToArray();
-                        var oldServices = servicesBag.Where(s => !newServices.Select(x => x.Id).Contains(s.Id)).ToArray();
+                        var oldServices = servicesBag.Where(s => !services.Select(x => x.Id).Contains(s.Id)).ToArray();
                         while (!servicesBag.IsEmpty)
                         {
                             servicesBag.TryTake(out ServiceDescription s);
