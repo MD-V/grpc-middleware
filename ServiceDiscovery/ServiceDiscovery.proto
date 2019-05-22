@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package servicediscovery;
+
+// Service for server registration
+service ServiceRegistration {
+  rpc Register (RegisterRequest) returns (RegisterReply) {}
+}
+
+// Registers a server
+message RegisterRequest {
+    ServiceEntry entry = 1;
+    oneof healthcheck {
+        TtlHealthCheck ttlHealthCheck = 4;
+        GrpcHealthCheck gRpcHealthCheck = 9;
+      }
+  }
+  
+message RegisterReply {
+    bool success = 1;
+  }
+
+service ServiceCatalog {
+    rpc ListServices (ListServicesRequest) returns (ListServicesReply) {}
+}
+
+// Requests a list of services
+message ListServicesRequest {
+    string name = 1;
+    string instance = 2;
+    string hostname = 3;
+  }
+  
+// Returns a list of service entries
+message ListServicesReply {
+    repeated ServiceEntry entries = 1;
+  }
+
+/*
+  Common messages
+*/
+
+// Describes a service
+message ServiceEntry {
+    string name = 1;
+    string instance = 2;
+    repeated string tags = 3;
+    string endpoint = 4;
+    string hostname = 5;
+    string interface = 6;
+  }
+
+  // TTL health check
+  message TtlHealthCheck {
+    string timeout = 1; 
+  }
+
+  // gRPC health check
+  message GrpcHealthCheck {
+    string endpoint = 1; 
+  }
